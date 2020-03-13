@@ -4,13 +4,16 @@ The TCP server/client will be managed by a separate set of coroutines running on
 """
 import asyncio
 
-from sionnach import exceptions
+from sionnach import exceptions, log
+from sionnach.character import Character
 from sionnach.server import Server
+
+logger = log.logger("sionnach.main")
 
 
 class Act:
     def __init__(self):
-        print("[Sionnach]")
+        logger.info("== Sionnach ==")
 
         self.server = None
 
@@ -21,10 +24,13 @@ class Act:
         Initialises the server and starts iterating over the main loop.
         :return:
         """
-        print("Initialising server...")
-        self.server = Server()
+        logger.info("Initialising server...")
+        self.server = Server(
+            register_client=self.register_client,
+            deregister_client=self.deregister_client,
+        )
 
-        print("Systems online.")
+        logger.info("Systems online.")
         try:
             asyncio.create_task(self.iterate_controller())
         except (exceptions.RestartInterrupt, exceptions.ShutdownInterrupt):
@@ -37,8 +43,8 @@ class Act:
         :return:
         """
         try:
-            print("Iterate.")
-            await asyncio.sleep(1)
+            logger.debug("Iterate.")
+            await asyncio.sleep(5)
         except Exception:
             raise
 
@@ -50,11 +56,16 @@ class Act:
     # ---------------------------
     # Character/client management
     # ---------------------------
-    async def register_client(self, client):
+    def register_client(self, client):
+        character = Character(client)
+        self.characters.append(character)
+
+    def deregister_client(self, client):
+        # TODO: Match with character and remove
         pass
 
 
-def execute():
+def init():
     """
     Initialises the controller and runs the main system loop until a shutdown
     is requested.
@@ -76,4 +87,4 @@ def execute():
 
 
 if __name__ == "__main__":
-    execute()
+    init()

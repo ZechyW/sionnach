@@ -55,12 +55,15 @@ class Client:
         - Watch out for a kill order from above
         :return:
         """
-        logger.info(f"({self.remote_ip}) New client.")
+        logger.debug(f"({self.remote_ip}) New client.")
 
-        comm_tasks = {asyncio.create_task(self._receive_to_queue())}
+        comm_tasks = {
+            asyncio.create_task(self._receive_to_queue()),
+            asyncio.create_task(self._send_from_queue()),
+        }
         done, pending = await asyncio.wait(comm_tasks, return_when=FIRST_COMPLETED)
 
-        logger.info(f"({self.remote_ip}) Cleaning up client.")
+        logger.debug(f"({self.remote_ip}) Cleaning up client.")
 
         # async def handle_echo(self, reader, writer):
         #     data = await reader.read(100)
@@ -87,10 +90,10 @@ class Client:
             # "If the EOF was received and the internal buffer is empty,
             # return an empty bytes object."
             if msg == b"":
-                logger.info(f"({self.remote_ip}) Client connection closed.")
+                logger.debug(f"({self.remote_ip}) Client closed socket.")
                 return
 
-            logger.info(f"({self.remote_ip}) [RECV] {msg}")
+            logger.debug(f"({self.remote_ip}) [RECV] {msg}")
 
             await self.input_queue.put(msg)
 
@@ -98,3 +101,12 @@ class Client:
 
         except CancelledError:
             logger.debug(f"({self.remote_ip}) Cancelling receiver...")
+
+    async def _send_from_queue(self):
+        try:
+            msg = await self.output_queue.get()
+            self.writer.write(msg.encode())
+            await self.writer.drain()
+
+        except CancelledError:
+            logger.debug(f"({self.remote_ip}) Cancelling sender...")

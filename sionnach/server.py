@@ -8,7 +8,7 @@ Higher-level functionality is handled by the Character class
 import asyncio
 from asyncio import CancelledError, FIRST_COMPLETED, StreamReader, StreamWriter
 
-from sionnach import log, config
+from sionnach import config, log
 
 logger = log.logger(__name__)
 
@@ -105,6 +105,19 @@ class Client:
         """
         return await self.input_queue.get()
 
+    def set_password_mode(self, mode):
+        """
+        Send IAC WILL/WON'T ECHO based on the mode param.
+        If True, send WILL ECHO so that the client stops local echo (but we don't
+        actually send remote echoes either, so that passwords are not revealed)
+        :param mode:
+        :return:
+        """
+        if mode:
+            self.output_queue.put_nowait(bytes([IAC, WILL, ECHO]))
+        else:
+            self.output_queue.put_nowait(bytes([IAC, WONT, ECHO]))
+
     # ---------------------------
     # Private helpers
     async def _receive_to_queue(self):
@@ -121,8 +134,12 @@ class Client:
                 logger.debug(f"({self.remote_ip}) Client closed socket.")
                 return
 
-            msg = msg.decode().strip()[0 : config.max_input_length]
+            # Watch for telnet commands
+            while msg[0] == IAC:
+                # Just strip them for now
+                msg = msg[3:]
 
+            msg = msg.decode().strip()[0 : config.max_input_length]
             logger.debug(f"({self.remote_ip}) [RECV] {msg}")
 
             # Register as next available input from client
@@ -163,21 +180,25 @@ class Client:
         :return:
         """
         # Prepare debug preview
-        msg_preview = (
-            msg[0 : config.output_preview_length]
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-        )
+        msg_preview = msg[0 : config.output_preview_length]
 
-        if len(msg) > config.output_preview_length:
-            msg_preview += "..."
+        # Some things should only be done on actual strings, not raw bytestrings
+        # (i.e., telnet commands)
+        if isinstance(msg, str):
+            msg_preview = msg_preview.replace("\n", "\\n").replace("\r", "\\r")
 
-        # Always end with a newline for the client
-        if msg[-2:] != "\r\n":
-            msg = f"{msg}\r\n"
+            if len(msg) > config.output_preview_length:
+                msg_preview += "..."
 
-        # Perform actual write
-        self.writer.write(msg.encode())
+            # Always end with a newline for the client
+            if msg[-2:] != "\r\n":
+                msg = f"{msg}\r\n"
+
+            # Encode string to bytes
+            msg = msg.encode()
+
+        # Perform actual write (message in raw bytes)
+        self.writer.write(msg)
         await self.writer.drain()
         logger.debug(f"({self.remote_ip}) [SEND] {msg_preview}")
 
@@ -189,3 +210,34 @@ class Client:
         # Goodbye
         self.writer.close()
         await self.writer.wait_closed()
+
+
+# --[ Telnet Commands ]---------------------------------------------------------
+# (Adapted from https://github.com/quixadhal/PykuMUD)
+SE = 240  # End of subnegotiation parameters
+NOP = 241  # No operation
+DATMK = 242  # Data stream portion of a sync.
+BREAK = 243  # NVT Character BRK
+IP = 244  # Interrupt Process
+AO = 245  # Abort Output
+AYT = 246  # Are you there
+EC = 247  # Erase Character
+EL = 248  # Erase Line
+GA = 249  # The Go Ahead Signal
+SB = 250  # Sub-option to follow
+WILL = 251  # Will; request or confirm option begin
+WONT = 252  # Wont; deny option request
+DO = 253  # Do = Request or confirm remote option
+DONT = 254  # Don't = Demand or confirm option halt
+IAC = 255  # Interpret as Command
+SEND = 1  # Sub-process negotiation SEND command
+IS = 0  # Sub-process negotiation IS command
+
+# --[ Telnet Options ]----------------------------------------------------------
+BINARY = 0  # Transmit Binary
+ECHO = 1  # Echo characters back to sender
+RECON = 2  # Reconnection
+SGA = 3  # Suppress Go-Ahead
+TTYPE = 24  # Terminal Type
+NAWS = 31  # Negotiate About Window Size
+LINEMO = 34  # Line Mode

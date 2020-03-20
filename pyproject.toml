@@ -8,6 +8,7 @@ authors = ["ZechyW <ZechyW@users.noreply.github.com>"]
 python = "^3.8"
 black = "^19.10b0"
 SQLAlchemy = "^1.3.15"
+bcrypt = "^3.1.7"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

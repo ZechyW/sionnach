@@ -20,3 +20,15 @@ class ShutdownInterrupt(Exception):
 
     def __str__(self):
         return repr(self.value)
+
+
+class AuthInvalidPassword(Exception):
+    """
+    Client failed to authenticate using given password
+    """
+
+    def __init__(self):
+        self.value = "AuthInvalidPassword"
+
+    def __str__(self):
+        return repr(self.value)

@@ -4,6 +4,7 @@ The TCP server/client will be managed by a separate set of coroutines running
 on the same event loop.
 """
 import asyncio
+from contextlib import suppress
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -72,9 +73,8 @@ class Act:
         try:
             await self.tick()
         except exceptions.RestartInterrupt:
-            pass
+            raise
         except exceptions.ShutdownInterrupt:
-            await self.shutdown()
             raise
 
     async def tick(self):
@@ -103,9 +103,35 @@ class Act:
 
         return await self.tick()
 
-    async def shutdown(self):
+    def shutdown(self):
+        """
+        Cannot be run as an asynchronous task, or we get infinite recursion errors
+        trying to get it to cancel itself
+        :return:
+        """
         logger.info("Shutting down.")
-        pass
+        loop = asyncio.get_event_loop()
+
+        # Handle connections
+        for client in self.unauthed_clients:
+            loop.run_until_complete(client.close())
+
+        for char in self.authed_chars:
+            loop.run_until_complete(char.async_close())
+
+        # Handle stray tasks
+        pending = asyncio.all_tasks(loop)
+
+        for task in pending:
+            if not task.cancelled():
+                task.cancel()
+
+        with suppress(asyncio.CancelledError):
+            loop.run_until_complete(asyncio.gather(*pending))
+
+        loop.run_until_complete(loop.shutdown_asyncgens())
+
+        logger.info("Shutdown complete.")
 
     # ----------------------------------
     # Character/client management
@@ -155,4 +181,10 @@ class Act:
 
 if __name__ == "__main__":
     actor = Act()
-    asyncio.run(actor.run())
+
+    # Handle high-level shutdown/restart interrupts
+    try:
+        asyncio.get_event_loop().run_until_complete(actor.run())
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested via KeyboardInterrupt at console.")
+        actor.shutdown()

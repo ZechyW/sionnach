@@ -8,7 +8,7 @@ debug = True
 db_uri = "sqlite:///data/data.db"
 
 # Listen port for the server
-port = 8888
+port = 4000
 
 # World tick interval (in s)
 tick_interval = 5

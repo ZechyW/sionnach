@@ -20,7 +20,8 @@ class Auth:
 
     async def authenticate_client(self, client: Client):
         """
-        When passed unauthenticated clients and awaited, returns authenticated clients.
+        When passed unauthenticated clients, asynchronously attempts to authenticate
+        them and registers them against the main controller's callback
         :param client:
         :return:
         """
@@ -31,11 +32,12 @@ class Auth:
         try:
             profile = await self._login(client)
         except AuthInvalidPassword:
-            client.close()
+            await client.close()
             return
 
-        # Execute callback
+        # At this point, the client has logged in successfully.
         character = Character(client=client, name=profile.name)
+        return self.mark_authenticated(character)
 
     async def _login(self, client):
         """

@@ -37,4 +37,6 @@ class Engine:
         Send any extra input to user.
         :return:
         """
-        pass
+        # Debug
+        for char in self.characters:
+            char.send(f"<TICK> {len(self.characters)} character(s) connected.")

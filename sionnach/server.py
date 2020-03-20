@@ -47,7 +47,10 @@ class Client:
         self.input_queue = asyncio.Queue()
         self.output_queue = asyncio.Queue()
 
+        # When a value is set on this Future, the client is set to be dropped...
         self.kill_switch = asyncio.get_running_loop().create_future()
+        # Which will trigger resolution on this Future.
+        self.closed = asyncio.get_running_loop().create_future()
 
     async def communicate_until_closed(self):
         """
@@ -76,18 +79,25 @@ class Client:
             if task is self.kill_switch:
                 continue
 
-            task.cancel()
+            if not task.cancelled():
+                task.cancel()
+
             await task
 
         await self._close_socket()
-        logger.debug(f"({self.remote_ip}) Client dropped.")
 
-    def close(self):
+        logger.debug(f"({self.remote_ip}) Client dropped.")
+        self.closed.set_result(True)
+
+    async def close(self):
         """
         Synchronous method that drops the client as soon as possible.
+        Does not have to be awaited, unless we explicitly want to do something after
+        the client is fully dropped.
         :return:
         """
         self.kill_switch.set_result(True)
+        return await self.closed
 
     def send(self, msg):
         """
@@ -128,16 +138,16 @@ class Client:
         try:
             msg = await self.reader.readline()
 
+            # Watch for telnet commands
+            while len(msg) > 0 and msg[0] == IAC:
+                # Just strip them for now
+                msg = msg[3:]
+
             # "If the EOF was received and the internal buffer is empty,
             # return an empty bytes object."
             if msg == b"":
                 logger.debug(f"({self.remote_ip}) Client closed socket.")
                 return
-
-            # Watch for telnet commands
-            while msg[0] == IAC:
-                # Just strip them for now
-                msg = msg[3:]
 
             msg = msg.decode().strip()[0 : config.max_input_length]
             logger.debug(f"({self.remote_ip}) [RECV] {msg}")
@@ -163,7 +173,7 @@ class Client:
             return await self._send_from_queue()
 
         except CancelledError:
-            await self.output_queue.put("Server closed connection.")
+            await self.output_queue.put("Server closed connection.  Goodbye.")
 
             # Flush any remaining messages immediately
             while self.output_queue.qsize() > 0:

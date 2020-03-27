@@ -5,6 +5,7 @@ Handles main system logic
 - Sends output to users
 """
 from sionnach import log
+from sionnach.util import get_helpfile
 
 logger = log.logger("sionnach.engine")
 
@@ -39,4 +40,4 @@ class Engine:
         """
         # Debug
         for char in self.characters:
-            char.send(f"<TICK> {len(self.characters)} character(s) connected.")
+            char.send(f"<TICK> {len(self.characters)} active connection(s).")

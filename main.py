@@ -182,6 +182,13 @@ class Act:
 if __name__ == "__main__":
     actor = Act()
 
+    # Asyncio might need to allow nested loops, depending on the kernel/IDE/etc we
+    # are using
+    if config.nest_asyncio:
+        import nest_asyncio
+
+        nest_asyncio.apply()
+
     # Handle high-level shutdown/restart interrupts
     try:
         asyncio.get_event_loop().run_until_complete(actor.run())

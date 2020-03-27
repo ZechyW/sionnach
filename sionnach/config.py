@@ -4,6 +4,9 @@ Config
 # Debug mode
 debug = True
 
+# Whether to enable the nested asyncio loop patch
+nest_asyncio = True
+
 # Database connection string (for SQLAlchemy)
 db_uri = "sqlite:///data/data.db"
 

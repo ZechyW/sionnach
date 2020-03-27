@@ -106,6 +106,19 @@ class Client:
         :param msg:
         :return:
         """
+
+        # Add a newline for the client if necessary
+        if msg[-2:] != "\r\n":
+            msg = f"{msg}\r\n"
+
+        self.send_raw(msg)
+
+    def send_raw(self, msg):
+        """
+        Synchronous method that sends the given message as is to the client, without
+        doing any processing (e.g., adding newlines)
+        :return:
+        """
         self.output_queue.put_nowait(msg)
 
     async def async_receive(self):
@@ -124,9 +137,9 @@ class Client:
         :return:
         """
         if mode:
-            self.output_queue.put_nowait(bytes([IAC, WILL, ECHO]))
+            self.send_raw(bytes([IAC, WILL, ECHO]))
         else:
-            self.output_queue.put_nowait(bytes([IAC, WONT, ECHO]))
+            self.send_raw(bytes([IAC, WONT, ECHO]))
 
     # ---------------------------
     # Private helpers
@@ -199,10 +212,6 @@ class Client:
 
             if len(msg) > config.output_preview_length:
                 msg_preview += "..."
-
-            # Always end with a newline for the client
-            if msg[-2:] != "\r\n":
-                msg = f"{msg}\r\n"
 
             # Encode string to bytes
             msg = msg.encode()

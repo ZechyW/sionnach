@@ -9,6 +9,7 @@ from sionnach.character import Character
 from sionnach.db import Help, User
 from sionnach.exceptions import AuthInvalidPassword
 from sionnach.server import Client
+from sionnach.util import get_helpfile
 
 logger = log.logger(__name__)
 
@@ -26,8 +27,8 @@ class Auth:
         :return:
         """
         # Hello, client!
-        login_msg: Help = self.db_session.query(Help).filter(Help.name == "LOGIN").one()
-        client.send(f"{login_msg.text}\r\n\r\nName:")
+        client.send(get_helpfile(self.db_session, "LOGIN"))
+        client.send_raw(f"Name: ")
 
         try:
             profile = await self._login(client)
@@ -50,15 +51,17 @@ class Auth:
         while name.strip() == "":
             name = await client.async_receive()
 
-        profile = None
         try:
             # Try to grab an existing profile and authenticate
             profile = (
                 self.db_session.query(User).filter(User.name == name.lower()).one()
             )
-            client.send(f"Password:")
+            client.send_raw(f"Password: ")
             client.set_password_mode(True)
             password = await client.async_receive()
+            # Add a newline here, because password mode stops the client-side newline
+            # echo
+            client.send("")
             if not bcrypt.checkpw(password.encode(), profile.password):
                 client.send(f"Invalid password.")
                 raise AuthInvalidPassword
@@ -67,7 +70,9 @@ class Auth:
             # Use the newly created profile
             profile = await self._new_user(client, name)
 
+        # Authenticated.
         client.set_password_mode(False)
+        client.send(get_helpfile(self.db_session, "MOTD"))
         return profile
 
     async def _new_user(self, client, name):

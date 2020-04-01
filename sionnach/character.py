@@ -1,8 +1,7 @@
 """
-Handles high-level communication between the system and individual character
+Handles high-level communication and management of individual characters and their
 connections
 """
-import asyncio
 from asyncio import QueueEmpty
 
 
@@ -10,6 +9,10 @@ class Character:
     def __init__(self, client, name):
         self.client = client
         self.name = name
+
+    # =-=-=-=-=-=-=
+    # Communication
+    # =-=-=-=-=-=-=
 
     def get_input(self):
         """
@@ -37,3 +40,14 @@ class Character:
         """
         # TODO: Save, any other cleanup
         return await self.client.close()
+
+    # =-=-=-=-=-=
+    # Management
+    # =-=-=-=-=-=
+    def init(self, db_session):
+        """
+        Loads attributes from the DB.  Only this method and the .save() method should
+        be able to touch the DB
+        :return:
+        """
+        pass

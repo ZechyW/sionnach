@@ -23,6 +23,8 @@ class Engine:
         :return:
         """
         self.characters.append(character)
+        # Load attributes from DB and perform other initialisation
+        character.init(self.db_session)
 
     def remove_char(self, character):
         """
